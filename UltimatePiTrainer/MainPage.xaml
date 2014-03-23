@@ -41,13 +41,32 @@
 
         <!--TitlePanel contains the name of the application and page title-->
         <StackPanel x:Name="TitlePanel" Grid.Row="0" Margin="12,17,0,28">
-            <TextBlock x:Name="AppNameTextBlock" Text="Ultimate Pi Trainer" Style="{StaticResource PhoneTextNormalStyle}" Margin="12,0"/>
-            <TextBlock x:Name="PageNameTextBlock" Margin="9,-7,0,0" Style="{StaticResource PhoneTextTitle1Style}"/>
+            <TextBlock x:Name="AppNameTextBlock" Style="{StaticResource PhoneTextNormalStyle}" Margin="12,0" Text="ULTIMATE PI TRAINER"/>
         </StackPanel>
 
         <!--ContentPanel - place additional content here-->
-        <Grid x:Name="ContentPanel" Grid.Row="1" Margin="12,0,12,0">
-        	<TextBox HorizontalAlignment="Left" Height="112" TextWrapping="Wrap" VerticalAlignment="Top" Width="456"/>
+        <Grid x:Name="ContentPanel" Grid.Row="1" Margin="12,0">
+        	<TextBox x:Name="NumbersInputTextBox" HorizontalAlignment="Left" Height="112" TextWrapping="Wrap" VerticalAlignment="Top" Width="456" Margin="0,77,0,0" Text="3." FontSize="48" TextAlignment="Right"/>
+        	<TextBlock x:Name="CorrectNumbersTextBlock" HorizontalAlignment="Left" Height="62" TextWrapping="Wrap" VerticalAlignment="Top" Width="267" Margin="0,10,0,0"/>
+        	<Button x:Name="ShowCorrectButton" Content="Show Correct" HorizontalAlignment="Left" Height="72" Margin="267,0,0,0" VerticalAlignment="Top" Width="189" Foreground="White"/>
+        	<Grid x:Name="NumberGrid" HorizontalAlignment="Left" Height="497" Margin="10,189,0,0" VerticalAlignment="Top" Width="436">
+        		<Button x:Name="Button7" HorizontalAlignment="Left" Height="124" VerticalAlignment="Top" Width="150" Content="7" Click="NumberButton_Click"/>
+                <Button x:Name="Button8" HorizontalAlignment="Center" Height="124" VerticalAlignment="Top" Width="150" Margin="143,0" Content="8" Click="NumberButton_Click"/>
+                <Button x:Name="Button9" Content="9" HorizontalAlignment="Right" Height="124" VerticalAlignment="Top" Width="150" Click="NumberButton_Click"/>
+                <Button x:Name="Button4" Content="4" HorizontalAlignment="Left" Height="125" VerticalAlignment="Top" Width="150" Margin="0,124,0,0" Click="NumberButton_Click"/>
+                <Button x:Name="Button5" HorizontalAlignment="Center" Height="125" VerticalAlignment="Top" Width="150" Margin="143,124,143,0" Content="5" Click="NumberButton_Click"/>
+                <Button x:Name="Button6" Content="6" HorizontalAlignment="Right" Height="125" VerticalAlignment="Top" Width="150" Margin="0,124,0,0" Click="NumberButton_Click"/>
+                <Button x:Name="Button1" Content="1" HorizontalAlignment="Left" Height="124" VerticalAlignment="Top" Width="150" Margin="0,249,0,0" Click="NumberButton_Click"/>
+                <Button x:Name="Button2" HorizontalAlignment="Center" Height="124" VerticalAlignment="Top" Width="150" Margin="143,249,143,0" Content="2" Click="NumberButton_Click"/>
+                <Button x:Name="Button3" Content="3" HorizontalAlignment="Right" Height="124" VerticalAlignment="Top" Width="150" Margin="0,249,0,0" Click="NumberButton_Click"/>
+                <Button x:Name="Button0" HorizontalAlignment="Center" Height="124" VerticalAlignment="Top" Width="426" Margin="0,373,10,0" Content="0" Click="NumberButton_Click"/>
+        	</Grid>
+        	<Grid x:Name="MessageWindow" Margin="10,189,10,247" Background="#FF212121" d:IsHidden="True">
+        		<TextBlock x:Name="MessageWindowTitleTextBlock" HorizontalAlignment="Left" TextWrapping="Wrap" Text="Message Window Title" VerticalAlignment="Top" Width="436" Height="44" FontSize="24" TextAlignment="Center" Margin="-1,1,0,0"/>
+        		<Rectangle x:Name="MessageWindowSeparator" Fill="#FFF4F4F5" HorizontalAlignment="Left" Height="3" Margin="0,40,0,0" Stroke="Black" VerticalAlignment="Top" Width="435"/>
+        		<TextBlock x:Name="MessageWindowContentTextBlock" HorizontalAlignment="Left" TextWrapping="Wrap" Text="Message Content" VerticalAlignment="Top" Width="416" Height="118" FontSize="24" Margin="10,58,0,0"/>
+        		<Button x:Name="MessageWindowOKButton" Content="OK" HorizontalAlignment="Center" Height="74" Margin="106,176,107,0" VerticalAlignment="Top" Width="223"/>
+        	</Grid>
         </Grid>
 
         <!--Uncomment to see an alignment grid to help ensure your controls are

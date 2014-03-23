@@ -13,6 +13,17 @@ namespace UltimatePiTrainer
 {
     public partial class MainPage : PhoneApplicationPage
     {
+
+
+        private string _correctGroupNumber = "";
+        private string _currentInputNumbers = "";
+
+        private string _errorWindowTitle = "Uh oh! Wrong Number!";
+        private string _errorWindowContent { get { return "The correct sequence is: " + _correctGroupNumber; } }
+
+        private string _successWindowTitle = "Congratulations!";
+        private string _successWindowContent = "
+
         // Constructor
         public MainPage()
         {
@@ -20,6 +31,21 @@ namespace UltimatePiTrainer
 
             // Sample code to localize the ApplicationBar
             //BuildLocalizedApplicationBar();
+        }
+
+        private void NumberButton_Click(object sender, RoutedEventArgs e)
+        {
+            _currentInputNumbers += (sender as Button).Content;
+            if (_currentInputNumbers == _correctGroupNumber)
+            {
+                MessageWindowContentTextBlock.Text = 
+            }
+            if (_currentInputNumbers != _correctGroupNumber.Substring(0, _correctGroupNumber.Length))
+            {
+                MessageWindowTitleTextBlock.Text = _errorWindowTitle;
+                MessageWindowContentTextBlock.Text = _errorWindowContent;
+                MessageWindow.Visibility = System.Windows.Visibility.Visible;
+            }
         }
 
         // Sample code for building a localized ApplicationBar
