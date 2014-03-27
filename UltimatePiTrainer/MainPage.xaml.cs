@@ -22,7 +22,7 @@ namespace UltimatePiTrainer
         private string _errorWindowContent { get { return "The correct sequence is: " + _correctGroupNumber; } }
 
         private string _successWindowTitle = "Congratulations!";
-        private string _successWindowContent = "
+        private string _successWindowContent = "";
 
         // Constructor
         public MainPage()
