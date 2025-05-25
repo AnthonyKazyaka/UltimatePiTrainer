@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all history for PR detection
 
       - name: Get branch name
         id: branch-name
@@ -45,6 +47,12 @@ jobs:
           else
             echo "BASE_HREF=${{ github.event.inputs.base_href }}" >> $GITHUB_ENV
           fi
+      
+      - name: Update base href in index.html
+        run: |
+          # Update the base href in index.html with the correct path for the branch
+          sed -i 's|<base href="/">|<base href="${{ env.BASE_HREF }}">|g' index.html
+          echo "Updated base href to ${{ env.BASE_HREF }}"
 
       - name: Deploy to GitHub Pages subdirectory
         uses: peaceiris/actions-gh-pages@v3
@@ -54,20 +62,29 @@ jobs:
           destination_dir: branches/${{ env.SAFE_BRANCH_NAME }}
           keep_files: true
 
+      - name: Setup GitHub CLI
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: cli/cli@v2
+
       - name: Find associated PR
         id: find-pr
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
+          # Extract PR number from input if provided
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.pr_number }}" != "" ]]; then
             echo "PR_NUMBER=${{ github.event.inputs.pr_number }}" >> $GITHUB_ENV
             echo "has_pr=true" >> $GITHUB_OUTPUT
           else
-            PR_NUMBER=$(gh pr list --head ${{ github.ref_name }} --state open --json number --jq '.[0].number')
-            echo "Found PR: $PR_NUMBER"
-            echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+            # Try to find associated PR using GitHub CLI
+            cd $GITHUB_WORKSPACE
+            PR_NUMBER=$(gh pr list --head "${{ github.ref_name }}" --state open --json number --jq '.[0].number')
+            
             if [ -n "$PR_NUMBER" ]; then
+              echo "Found PR: $PR_NUMBER"
+              echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
               echo "has_pr=true" >> $GITHUB_OUTPUT
             else
+              echo "No open PR found for this branch"
               echo "has_pr=false" >> $GITHUB_OUTPUT
             fi
           fi
@@ -77,6 +94,8 @@ jobs:
       - name: Update PR description with branch URL
         if: steps.find-pr.outputs.has_pr == 'true'
         run: |
+          cd $GITHUB_WORKSPACE
+          
           # Get current PR description
           PR_INFO=$(gh pr view ${{ env.PR_NUMBER }} --json body)
           PR_BODY=$(echo "$PR_INFO" | jq -r '.body')

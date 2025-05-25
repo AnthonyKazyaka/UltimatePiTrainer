@@ -25,6 +25,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       
+      - name: Update base href in index.html
+        run: |
+          # Update the base href in index.html with the correct root path
+          sed -i 's|<base href="/">|<base href="/UltimatePiTrainer/">|g' index.html
+          echo "Updated base href to /UltimatePiTrainer/"
+      
       - name: Setup Pages
         uses: actions/configure-pages@v3
       
