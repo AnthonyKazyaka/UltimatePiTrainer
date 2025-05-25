@@ -62,9 +62,12 @@ jobs:
           destination_dir: branches/${{ env.SAFE_BRANCH_NAME }}
           keep_files: true
 
-      - name: Setup GitHub CLI
+      - name: Authenticate with GitHub CLI
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        uses: github/cli@v2
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Find associated PR
         id: find-pr
@@ -89,7 +92,7 @@ jobs:
             fi
           fi
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update PR description with branch URL
         if: steps.find-pr.outputs.has_pr == 'true'
@@ -116,4 +119,4 @@ jobs:
             echo "Branch URL already exists in PR description"
           fi
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
