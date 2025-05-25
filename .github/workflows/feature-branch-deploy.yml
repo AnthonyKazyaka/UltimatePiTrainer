@@ -29,6 +29,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0  # Fetch all history for PR detection
+          persist-credentials: true  # Ensure credentials are available for subsequent Git operations
 
       - name: Get branch name
         id: branch-name
@@ -66,22 +67,33 @@ jobs:
 
       - name: Find associated PR
         id: find-pr
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
+          # Diagnostic information
+          echo "Current directory: $(pwd)"
+          echo "Directory contents: $(ls -la)"
+          echo "GitHub Ref: ${{ github.ref }}"
+          echo "GitHub Ref Name: ${{ github.ref_name }}"
+          echo "Event name: ${{ github.event_name }}"
+          
           # Extract PR number from input if provided
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.pr_number }}" != "" ]]; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.pr_number }}" ]]; then
+            echo "Using provided PR number: ${{ github.event.inputs.pr_number }}"
             echo "PR_NUMBER=${{ github.event.inputs.pr_number }}" >> $GITHUB_ENV
             echo "has_pr=true" >> $GITHUB_OUTPUT
           else
             # Try to find associated PR using GitHub CLI
-            PR_NUMBER=$(gh pr list --head "${{ github.ref_name }}" --state open --json number --jq '.[0].number')
+            echo "Attempting to find PR using GitHub CLI..."
+            # Add error handling to prevent pipeline failure
+            PR_NUMBER=$(gh pr list --head "${{ github.ref_name }}" --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
+            GH_STATUS=$?
+            echo "GitHub CLI command exit status: $GH_STATUS"
             
             if [ -n "$PR_NUMBER" ]; then
               echo "Found PR: $PR_NUMBER"
               echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
               echo "has_pr=true" >> $GITHUB_OUTPUT
             else
-              echo "No open PR found for this branch"
+              echo "No open PR found for this branch or command failed"
               echo "has_pr=false" >> $GITHUB_OUTPUT
             fi
           fi
@@ -91,12 +103,20 @@ jobs:
       - name: Update PR description with branch URL
         if: steps.find-pr.outputs.has_pr == 'true'
         run: |
+          # Diagnostic information
+          echo "Current directory: $(pwd)"
+          echo "PR Number: ${{ env.PR_NUMBER }}"
+          
           # Get current PR description
-          PR_INFO=$(gh pr view ${{ env.PR_NUMBER }} --json body)
+          echo "Fetching PR description..."
+          PR_INFO=$(gh pr view ${{ env.PR_NUMBER }} --json body 2>/dev/null || echo '{"body":""}')
+          GH_STATUS=$?
+          echo "GitHub CLI PR view command exit status: $GH_STATUS"
           PR_BODY=$(echo "$PR_INFO" | jq -r '.body')
           
           # Create feature branch URL
           BRANCH_URL="https://anthonykazyaka.github.io/UltimatePiTrainer/branches/${{ env.SAFE_BRANCH_NAME }}/"
+          echo "Branch URL: $BRANCH_URL"
           
           # Check if URL is already in the description
           if [[ "$PR_BODY" != *"$BRANCH_URL"* ]]; then
@@ -105,8 +125,15 @@ jobs:
             UPDATED_BODY="${PR_BODY}${NEWLINE}${NEWLINE}### Preview Deployment${NEWLINE}${NEWLINE}You can preview this branch at: [${BRANCH_URL}](${BRANCH_URL})"
             
             # Update the PR description
-            gh pr edit ${{ env.PR_NUMBER }} --body "$UPDATED_BODY"
-            echo "Updated PR description with branch URL"
+            echo "Updating PR description..."
+            gh pr edit ${{ env.PR_NUMBER }} --body "$UPDATED_BODY" 2>/dev/null || echo "Failed to update PR description"
+            GH_STATUS=$?
+            echo "GitHub CLI PR edit command exit status: $GH_STATUS"
+            if [ $GH_STATUS -eq 0 ]; then
+              echo "Updated PR description with branch URL"
+            else
+              echo "Failed to update PR description, but continuing workflow"
+            fi
           else
             echo "Branch URL already exists in PR description"
           fi
