@@ -64,7 +64,7 @@ jobs:
 
       - name: Setup GitHub CLI
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        uses: cli/cli@v2
+        uses: github/cli@v2
 
       - name: Find associated PR
         id: find-pr
