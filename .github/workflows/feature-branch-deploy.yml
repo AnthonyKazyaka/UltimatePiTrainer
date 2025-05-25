@@ -68,9 +68,6 @@ jobs:
         id: find-pr
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
-          # Always start by moving to the workspace directory
-          cd $GITHUB_WORKSPACE
-          
           # Extract PR number from input if provided
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.pr_number }}" != "" ]]; then
             echo "PR_NUMBER=${{ github.event.inputs.pr_number }}" >> $GITHUB_ENV
@@ -94,9 +91,6 @@ jobs:
       - name: Update PR description with branch URL
         if: steps.find-pr.outputs.has_pr == 'true'
         run: |
-          # Always start by moving to the workspace directory
-          cd $GITHUB_WORKSPACE
-          
           # Get current PR description
           PR_INFO=$(gh pr view ${{ env.PR_NUMBER }} --json body)
           PR_BODY=$(echo "$PR_INFO" | jq -r '.body')
