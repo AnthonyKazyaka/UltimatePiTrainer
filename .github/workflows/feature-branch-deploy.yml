@@ -19,6 +19,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write  # Additional permission that might help with PR interactions
 
 jobs:
   build-and-deploy:
@@ -74,6 +75,13 @@ jobs:
           echo "GitHub Ref: ${{ github.ref }}"
           echo "GitHub Ref Name: ${{ github.ref_name }}"
           echo "Event name: ${{ github.event_name }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Repository: ${{ github.repository }}"
+          
+          # Check token permissions
+          echo "Checking GitHub token permissions..."
+          TOKEN_INFO=$(gh auth status 2>&1 || echo "Token check failed")
+          echo "Token info: $TOKEN_INFO"
           
           # Extract PR number from input if provided
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.pr_number }}" ]]; then
@@ -84,16 +92,23 @@ jobs:
             # Try to find associated PR using GitHub CLI
             echo "Attempting to find PR using GitHub CLI..."
             # Add error handling to prevent pipeline failure
-            PR_NUMBER=$(gh pr list --head "${{ github.ref_name }}" --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
+            PR_LIST=$(gh pr list --head "${{ github.ref_name }}" --state open --json number,url,title --limit 5 2>&1 || echo "[]")
             GH_STATUS=$?
+            echo "GitHub CLI PR list output: $PR_LIST"
             echo "GitHub CLI command exit status: $GH_STATUS"
             
-            if [ -n "$PR_NUMBER" ]; then
+            PR_NUMBER=$(echo "$PR_LIST" | jq -r '.[0].number // empty' 2>/dev/null || echo "")
+            
+            if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
               echo "Found PR: $PR_NUMBER"
               echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
               echo "has_pr=true" >> $GITHUB_OUTPUT
             else
               echo "No open PR found for this branch or command failed"
+              # Try alternative method using git commands
+              echo "Trying alternative method to find PR..."
+              PR_BRANCHES=$(git log --merges --grep="Merge pull request" --format="%s" -n 10 2>/dev/null || echo "")
+              echo "PR branches from git log: $PR_BRANCHES"
               echo "has_pr=false" >> $GITHUB_OUTPUT
             fi
           fi
@@ -107,35 +122,77 @@ jobs:
           echo "Current directory: $(pwd)"
           echo "PR Number: ${{ env.PR_NUMBER }}"
           
-          # Get current PR description
-          echo "Fetching PR description..."
-          PR_INFO=$(gh pr view ${{ env.PR_NUMBER }} --json body 2>/dev/null || echo '{"body":""}')
-          GH_STATUS=$?
-          echo "GitHub CLI PR view command exit status: $GH_STATUS"
-          PR_BODY=$(echo "$PR_INFO" | jq -r '.body')
-          
           # Create feature branch URL
           BRANCH_URL="https://anthonykazyaka.github.io/UltimatePiTrainer/branches/${{ env.SAFE_BRANCH_NAME }}/"
           echo "Branch URL: $BRANCH_URL"
           
-          # Check if URL is already in the description
-          if [[ "$PR_BODY" != *"$BRANCH_URL"* ]]; then
-            # Append the URL to the PR description
-            NEWLINE=$'\n'
-            UPDATED_BODY="${PR_BODY}${NEWLINE}${NEWLINE}### Preview Deployment${NEWLINE}${NEWLINE}You can preview this branch at: [${BRANCH_URL}](${BRANCH_URL})"
+          # Try two different methods to update the PR description
+          
+          # Method 1: Direct GitHub CLI approach
+          echo "Trying method 1: Direct GitHub CLI approach"
+          # Get current PR description
+          echo "Fetching PR description..."
+          PR_INFO=$(gh pr view ${{ env.PR_NUMBER }} --json body 2>&1 || echo '{"body":""}')
+          GH_STATUS=$?
+          echo "GitHub CLI PR view output: $PR_INFO"
+          echo "GitHub CLI PR view command exit status: $GH_STATUS"
+          
+          if [ $GH_STATUS -eq 0 ]; then
+            PR_BODY=$(echo "$PR_INFO" | jq -r '.body // ""' 2>/dev/null || echo "")
             
-            # Update the PR description
-            echo "Updating PR description..."
-            gh pr edit ${{ env.PR_NUMBER }} --body "$UPDATED_BODY" 2>/dev/null || echo "Failed to update PR description"
-            GH_STATUS=$?
-            echo "GitHub CLI PR edit command exit status: $GH_STATUS"
-            if [ $GH_STATUS -eq 0 ]; then
-              echo "Updated PR description with branch URL"
+            # Check if URL is already in the description
+            if [[ "$PR_BODY" != *"$BRANCH_URL"* ]]; then
+              # Append the URL to the PR description
+              NEWLINE=$'\n'
+              UPDATED_BODY="${PR_BODY}${NEWLINE}${NEWLINE}### Preview Deployment${NEWLINE}${NEWLINE}You can preview this branch at: [${BRANCH_URL}](${BRANCH_URL})"
+              
+              # Update the PR description
+              echo "Updating PR description..."
+              UPDATE_RESULT=$(gh pr edit ${{ env.PR_NUMBER }} --body "$UPDATED_BODY" 2>&1 || echo "Failed to update PR description")
+              GH_STATUS=$?
+              echo "GitHub CLI PR edit output: $UPDATE_RESULT"
+              echo "GitHub CLI PR edit command exit status: $GH_STATUS"
+              
+              if [ $GH_STATUS -eq 0 ]; then
+                echo "Updated PR description with branch URL"
+              else
+                echo "Failed to update PR description using method 1, will try method 2"
+                # Method 2: Use the GitHub REST API directly
+                echo "Trying method 2: GitHub REST API"
+                
+                # Create a comment instead of updating the description
+                COMMENT="### Preview Deployment\n\nYou can preview this branch at: [${BRANCH_URL}](${BRANCH_URL})"
+                COMMENT_RESULT=$(gh api --method POST repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments \
+                  -f body="$COMMENT" 2>&1 || echo "Failed to add comment")
+                GH_STATUS=$?
+                echo "GitHub API comment result: $COMMENT_RESULT"
+                echo "GitHub API comment status: $GH_STATUS"
+                
+                if [ $GH_STATUS -eq 0 ]; then
+                  echo "Added preview URL as a comment instead of updating PR description"
+                else
+                  echo "Both methods failed. This is likely a permissions issue with the GITHUB_TOKEN."
+                  echo "Manual intervention may be required to update the PR description."
+                fi
+              fi
             else
-              echo "Failed to update PR description, but continuing workflow"
+              echo "Branch URL already exists in PR description"
             fi
           else
-            echo "Branch URL already exists in PR description"
+            echo "Failed to fetch PR description, trying method 2 directly"
+            # Method 2: Use the GitHub REST API to add a comment
+            COMMENT="### Preview Deployment\n\nYou can preview this branch at: [${BRANCH_URL}](${BRANCH_URL})"
+            COMMENT_RESULT=$(gh api --method POST repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments \
+              -f body="$COMMENT" 2>&1 || echo "Failed to add comment")
+            GH_STATUS=$?
+            echo "GitHub API comment result: $COMMENT_RESULT"
+            echo "GitHub API comment status: $GH_STATUS"
+            
+            if [ $GH_STATUS -eq 0 ]; then
+              echo "Added preview URL as a comment instead of updating PR description"
+            else
+              echo "Both methods failed. This is likely a permissions issue with the GITHUB_TOKEN."
+            fi
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
