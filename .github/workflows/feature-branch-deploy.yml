@@ -1,25 +1,27 @@
+---
 name: Deploy Feature Branch to GitHub Pages
 
 on:
   push:
     branches-ignore:
-      - main  # Exclude main branch as it's handled by the main deployment workflow
-  # Allow manual triggering of the workflow
+      - main  # Exclude main branch as it's handled by the main workflow
   workflow_dispatch:
     inputs:
       base_href:
-        description: 'Base href for the deployment (leave empty to use auto-generated)'
+        description: >-
+          Base href for the deployment (leave empty for auto-generated)
         required: false
         default: ''
       pr_number:
-        description: 'PR number to update description (leave empty to auto-detect)'
+        description: >-
+          PR number to update description (leave empty for auto-detect)
         required: false
         default: ''
 
 permissions:
   contents: write
   pull-requests: write
-  issues: write  # Additional permission that might help with PR interactions
+  issues: write  # Additional permission for PR interactions
 
 jobs:
   build-and-deploy:
@@ -30,7 +32,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0  # Fetch all history for PR detection
-          persist-credentials: true  # Ensure credentials are available for subsequent Git operations
+          persist-credentials: true  # Ensure credentials are available
 
       - name: Get branch name
         id: branch-name
@@ -39,20 +41,21 @@ jobs:
       - name: Set base href
         id: set-base-href
         run: |
-          # Sanitize branch name for use in URL by replacing special characters with hyphens
-          SAFE_BRANCH_NAME=$(echo "${{ steps.branch-name.outputs.current_branch }}" | sed 's/[^a-zA-Z0-9]/-/g')
+          # Sanitize branch name for use in URL
+          SAFE_BRANCH_NAME=$(echo "${{ steps.branch-name.outputs.current_branch }}" \
+            | sed 's/[^a-zA-Z0-9]/-/g')
           echo "SAFE_BRANCH_NAME=$SAFE_BRANCH_NAME" >> $GITHUB_ENV
-          
+
           # Use provided base href or construct one based on branch name
           if [ -z "${{ github.event.inputs.base_href }}" ]; then
             echo "BASE_HREF=/UltimatePiTrainer/branches/$SAFE_BRANCH_NAME/" >> $GITHUB_ENV
           else
             echo "BASE_HREF=${{ github.event.inputs.base_href }}" >> $GITHUB_ENV
           fi
-      
+
       - name: Update base href in index.html
         run: |
-          # Update the base href in index.html with the correct path for the branch
+          # Update the base href in index.html with the correct path for branch
           sed -i 's|<base href="/">|<base href="${{ env.BASE_HREF }}">|g' index.html
           echo "Updated base href to ${{ env.BASE_HREF }}"
 
@@ -64,115 +67,69 @@ jobs:
           destination_dir: branches/${{ env.SAFE_BRANCH_NAME }}
           keep_files: true
 
-      # GitHub CLI will authenticate automatically with GH_TOKEN environment variable
-
       - name: Find associated PR
         id: find-pr
         run: |
           # Diagnostic information
           echo "Current directory: $(pwd)"
-          echo "Directory contents: $(ls -la)"
           echo "GitHub Ref: ${{ github.ref }}"
           echo "GitHub Ref Name: ${{ github.ref_name }}"
           echo "Event name: ${{ github.event_name }}"
-          echo "Actor: ${{ github.actor }}"
-          echo "Repository: ${{ github.repository }}"
           
           # Check token permissions
-          echo "Checking GitHub token permissions..."
           TOKEN_INFO=$(gh auth status 2>&1 || echo "Token check failed")
           echo "Token info: $TOKEN_INFO"
-          
+
           # Extract PR number from input if provided
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.pr_number }}" ]]; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && \
+                -n "${{ github.event.inputs.pr_number }}" ]]; then
             echo "Using provided PR number: ${{ github.event.inputs.pr_number }}"
             echo "PR_NUMBER=${{ github.event.inputs.pr_number }}" >> $GITHUB_ENV
             echo "has_pr=true" >> $GITHUB_OUTPUT
           else
             # Try to find associated PR using GitHub CLI
             echo "Attempting to find PR using GitHub CLI..."
-            # Add error handling to prevent pipeline failure
-            PR_LIST=$(gh pr list --head "${{ github.ref_name }}" --state open --json number,url,title --limit 5 2>&1 || echo "[]")
-            GH_STATUS=$?
-            echo "GitHub CLI PR list output: $PR_LIST"
-            echo "GitHub CLI command exit status: $GH_STATUS"
+            PR_LIST=$(gh pr list --head "${{ github.ref_name }}" --state open \
+              --json number --limit 1 2>&1 || echo "[]")
             
-            PR_NUMBER=$(echo "$PR_LIST" | jq -r '.[0].number // empty' 2>/dev/null || echo "")
+            PR_NUMBER=$(echo "$PR_LIST" | jq -r '.[0].number // empty' 2>/dev/null \
+              || echo "")
             
             if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
               echo "Found PR: $PR_NUMBER"
               echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
               echo "has_pr=true" >> $GITHUB_OUTPUT
             else
-              echo "No open PR found for this branch or command failed"
-              # Try alternative method using Git API
-              echo "Trying alternative method via GitHub API..."
-              BRANCH_NAME="${{ github.ref_name }}"
-              API_RESULT=$(gh api repos/${{ github.repository }}/pulls?head=${{ github.repository_owner }}:${BRANCH_NAME}&state=open 2>&1 || echo "[]")
-              GH_STATUS=$?
-              echo "GitHub API result: $API_RESULT"
-              echo "GitHub API status: $GH_STATUS"
-              
-              PR_NUMBER=$(echo "$API_RESULT" | jq -r '.[0].number // empty' 2>/dev/null || echo "")
-              
-              if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
-                echo "Found PR via API: $PR_NUMBER"
-                echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
-                echo "has_pr=true" >> $GITHUB_OUTPUT
-              else
-                echo "No PR found through any method"
-                echo "has_pr=false" >> $GITHUB_OUTPUT
-              fi
+              echo "No PR found or command failed"
+              echo "has_pr=false" >> $GITHUB_OUTPUT
             fi
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Add preview URL comment to PR
-        id: add-comment
         if: steps.find-pr.outputs.has_pr == 'true'
         continue-on-error: true  # Don't fail the workflow if this step fails
         run: |
-          # Diagnostic information
-          echo "Current directory: $(pwd)"
-          echo "PR Number: ${{ env.PR_NUMBER }}"
-          
           # Create feature branch URL
           BRANCH_URL="https://anthonykazyaka.github.io/UltimatePiTrainer/branches/${{ env.SAFE_BRANCH_NAME }}/"
-          echo "Branch URL: $BRANCH_URL"
           
-          # Add a comment with the preview URL - keep it simple
-          echo "Adding a comment to the PR with the preview URL..."
-          COMMENT=$(cat <<EOF
-### Preview Deployment
-You can preview this branch at: [${BRANCH_URL}](${BRANCH_URL})
-EOF
-)
-          COMMENT_RESULT=$(gh api --method POST repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments \
-            -f body="$COMMENT" 2>&1)
-          COMMENT_STATUS=$?
+          # Create comment content
+          COMMENT="### Preview Deployment\nYou can preview this branch at: [$BRANCH_URL]($BRANCH_URL)"
           
-          if [ $COMMENT_STATUS -eq 0 ]; then
+          # Post comment
+          gh api --method POST \
+            "repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments" \
+            -f body="$COMMENT"
+            
+          if [ $? -eq 0 ]; then
             echo "Successfully added comment with preview URL"
-            echo "comment_added=true" >> $GITHUB_OUTPUT
           else
             echo "Failed to add comment with preview URL"
-            echo "Comment API Status: $COMMENT_STATUS"
-            echo "Comment Result: $COMMENT_RESULT"
-            echo "comment_added=false" >> $GITHUB_OUTPUT
-            # Don't fail the workflow, just report the issue
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Report preview URL status
+
+      - name: Log deployment result
         run: |
-          if [[ "${{ steps.find-pr.outputs.has_pr }}" == "true" ]]; then
-            if [[ "${{ steps.add-comment.outputs.comment_added }}" == "true" ]]; then
-              echo "✅ Successfully added preview URL to PR #${{ env.PR_NUMBER }}"
-            else
-              echo "⚠️ Could not add preview URL to PR #${{ env.PR_NUMBER }}, but deployment was successful"
-            fi
-          else
-            echo "ℹ️ No PR found for this branch, but deployment was successful"
-          fi
+          echo "Deployment completed to: https://anthonykazyaka.github.io/UltimatePiTrainer/branches/${{ env.SAFE_BRANCH_NAME }}/"
