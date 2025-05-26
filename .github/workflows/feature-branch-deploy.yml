@@ -143,7 +143,12 @@ jobs:
           
           # Add a comment with the preview URL - keep it simple
           echo "Adding a comment to the PR with the preview URL..."
-          COMMENT="### Preview Deployment\n\nYou can preview this branch at: [${BRANCH_URL}](${BRANCH_URL})"
+          COMMENT=$(cat <<EOF
+### Preview Deployment
+
+You can preview this branch at: [${BRANCH_URL}](${BRANCH_URL})
+EOF
+)
           COMMENT_RESULT=$(gh api --method POST repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments \
             -f body="$COMMENT" 2>&1)
           COMMENT_STATUS=$?
