@@ -145,7 +145,6 @@ jobs:
           echo "Adding a comment to the PR with the preview URL..."
           COMMENT=$(cat <<EOF
 ### Preview Deployment
-
 You can preview this branch at: [${BRANCH_URL}](${BRANCH_URL})
 EOF
 )
