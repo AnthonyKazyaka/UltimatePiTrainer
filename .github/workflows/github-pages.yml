@@ -1,9 +1,11 @@
+---
 name: Deploy to GitHub Pages
 
 on:
   push:
     branches:
-      - main  # Main branch deployment
+      # Main branch deployment
+      - main
   workflow_dispatch:
 
 permissions:
@@ -11,8 +13,9 @@ permissions:
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+# Allow only one concurrent deployment, skipping runs queued between the run
+# in-progress and latest queued. However, do NOT cancel in-progress runs as we
+# want to allow these production deployments to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -24,16 +27,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Fetch all history
-          persist-credentials: true  # Ensure credentials are available for subsequent Git operations
-      
+          # Fetch all history
+          fetch-depth: 0
+          # Ensure credentials are available for subsequent Git operations
+          persist-credentials: true
+
       - name: Diagnostic information
         run: |
           echo "Current directory: $(pwd)"
           echo "Directory contents: $(ls -la)"
           echo "GitHub Ref: ${{ github.ref }}"
           echo "GitHub Ref Name: ${{ github.ref_name }}"
-      
+
       - name: Update base href in index.html
         run: |
           # Update the base href in index.html with the correct root path
@@ -41,14 +46,14 @@ jobs:
           echo "Updated base href to /UltimatePiTrainer/"
           # Verify the change
           grep "<base href" index.html
-      
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./
           force_orphan: true
-        
+
       - name: Log deployment result
         run: |
           echo "Deployment completed to https://anthonykazyaka.github.io/UltimatePiTrainer/"
