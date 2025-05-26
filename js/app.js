@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let repeatCount = 1;
     let currentRepeat = 0;
     let sequenceMode = false;
+    let spacedRepetitionMode = false;
+    let spacedRepetitionDeck = [];  // Array of chunks with their spaced repetition data
     
     // DOM Elements
     const startButton = document.getElementById('start-button');
@@ -26,6 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const highestChunkSpan = document.getElementById('highest-chunk');
     const repeatCountInput = document.getElementById('repeat-count');
     const sequenceModeButton = document.getElementById('sequence-mode-button');
+    const spacedRepetitionModeButton = document.getElementById('spaced-repetition-mode-button');
     
     // Messages
     const errorWindowTitle = 'Uh oh! Wrong Number!';
@@ -55,6 +58,7 @@ document.addEventListener('DOMContentLoaded', function() {
             highestGroupIndex = savedState.highestGroupIndex || 0;
             chunkSize = savedState.chunkSize || 10;
             repeatCount = savedState.repeatCount || 1;
+            spacedRepetitionDeck = savedState.spacedRepetitionDeck || [];
             
             chunkSizeInput.value = chunkSize;
             repeatCountInput.value = repeatCount;
@@ -67,7 +71,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const stateToSave = {
             highestGroupIndex,
             chunkSize,
-            repeatCount
+            repeatCount,
+            spacedRepetitionDeck
         };
         localStorage.setItem('ultimatePiTrainer', JSON.stringify(stateToSave));
     }
@@ -113,7 +118,13 @@ document.addEventListener('DOMContentLoaded', function() {
         messageTitle.textContent = successWindowTitle;
         messageContent.textContent = successWindowContent;
         
-        if (sequenceMode) {
+        if (spacedRepetitionMode) {
+            // In spaced repetition mode, show progress
+            const chunk = spacedRepetitionDeck.find(c => c.chunkIndex === currentGroupIndex);
+            if (chunk) {
+                messageContent.textContent = `Great job! This chunk will move to box ${Math.min(chunk.box + 1, 5)}.`;
+            }
+        } else if (sequenceMode) {
             // In sequence mode, always advance to next chunk
             messageContent.textContent = 'Moving to next sequence chunk...';
         } else if (currentRepeat < repeatCount - 1) {
@@ -132,6 +143,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleError() {
         messageTitle.textContent = errorWindowTitle;
         messageContent.textContent = errorWindowContent();
+        
+        if (spacedRepetitionMode) {
+            messageContent.textContent += "\n\nThis chunk will move back to box 1 for more practice.";
+        }
+        
         messageWindow.style.display = 'block';
         
         // Highlight the error
@@ -163,7 +179,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Message OK button handler
     function handleMessageOk() {
         if (currentInputNumbers === correctGroupNumber) {
-            if (sequenceMode) {
+            if (spacedRepetitionMode) {
+                // Update the spaced repetition deck with success
+                updateSpacedRepetitionDeck(true);
+                // Load the next chunk due for review
+                loadNextSpacedRepetitionChunk();
+            } else if (sequenceMode) {
                 // In sequence mode, always move to next chunk
                 currentGroupIndex++;
                 correctGroupNumber = piDigits.substring(currentGroupIndex * chunkSize, (currentGroupIndex + 1) * chunkSize);
@@ -191,6 +212,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 correctGroupNumber = piDigits.substring(currentGroupIndex * chunkSize, (currentGroupIndex + 1) * chunkSize);
                 currentRepeat = 0;
             }
+        } else if (spacedRepetitionMode) {
+            // Failed in spaced repetition mode
+            updateSpacedRepetitionDeck(false);
+            // Try the same chunk again
         }
         
         messageWindow.style.display = 'none';
@@ -237,6 +262,164 @@ document.addEventListener('DOMContentLoaded', function() {
         saveToLocalStorage();
     }
     
+    // Spaced Repetition Functions
+    
+    // Toggle spaced repetition mode
+    function toggleSpacedRepetitionMode() {
+        spacedRepetitionMode = !spacedRepetitionMode;
+        sequenceMode = false; // Disable sequence mode when using spaced repetition
+        
+        if (spacedRepetitionMode) {
+            spacedRepetitionModeButton.textContent = 'Exit Spaced Repetition';
+            sequenceModeButton.disabled = true;
+            
+            // If deck is empty, initialize with current progress
+            if (spacedRepetitionDeck.length === 0) {
+                initializeSpacedRepetitionDeck();
+            }
+            
+            // Get the next chunk to practice
+            loadNextSpacedRepetitionChunk();
+        } else {
+            spacedRepetitionModeButton.textContent = 'Spaced Repetition';
+            sequenceModeButton.disabled = false;
+            
+            // Return to normal mode
+            currentGroupIndex = 0;
+            correctGroupNumber = piDigits.substring(0, chunkSize);
+        }
+        
+        clearInputNumbers();
+    }
+    
+    // Initialize the spaced repetition deck with chunks the user already knows
+    function initializeSpacedRepetitionDeck() {
+        // Clear any existing deck
+        spacedRepetitionDeck = [];
+        
+        // Add all chunks up to the highest known chunk
+        for (let i = 0; i <= highestGroupIndex; i++) {
+            spacedRepetitionDeck.push({
+                chunkIndex: i,
+                box: 1, // Start in box 1 (most frequent)
+                nextReview: Date.now(), // Review immediately
+                content: piDigits.substring(i * chunkSize, (i + 1) * chunkSize)
+            });
+        }
+        
+        saveToLocalStorage();
+    }
+    
+    // Load the next chunk due for review in spaced repetition
+    function loadNextSpacedRepetitionChunk() {
+        const now = Date.now();
+        
+        // Find chunks due for review
+        const dueChunks = spacedRepetitionDeck.filter(chunk => chunk.nextReview <= now);
+        
+        if (dueChunks.length > 0) {
+            // Sort by box (prioritize lower boxes) and then by nextReview date
+            dueChunks.sort((a, b) => {
+                if (a.box === b.box) {
+                    return a.nextReview - b.nextReview;
+                }
+                return a.box - b.box;
+            });
+            
+            // Take the first chunk
+            const nextChunk = dueChunks[0];
+            currentGroupIndex = nextChunk.chunkIndex;
+            correctGroupNumber = nextChunk.content;
+            
+            // If there's a previous chunk in the sequence, prepend it to the current chunk
+            // This implements the idea of showing both what they already know and what they're learning
+            if (currentGroupIndex > 0) {
+                const prevChunk = spacedRepetitionDeck.find(chunk => chunk.chunkIndex === currentGroupIndex - 1);
+                if (prevChunk && prevChunk.box > 1) { // Only include if they've shown some mastery of it
+                    correctGroupNumber = prevChunk.content + correctGroupNumber;
+                }
+            }
+        } else {
+            // No chunks due for review, add a new chunk if available
+            if (highestGroupIndex + 1 < Math.floor(piDigits.length / chunkSize)) {
+                // Add a new chunk
+                const newChunkIndex = highestGroupIndex + 1;
+                const newChunk = {
+                    chunkIndex: newChunkIndex,
+                    box: 1,
+                    nextReview: now,
+                    content: piDigits.substring(newChunkIndex * chunkSize, (newChunkIndex + 1) * chunkSize)
+                };
+                
+                spacedRepetitionDeck.push(newChunk);
+                highestGroupIndex = newChunkIndex;
+                highestChunkSpan.textContent = highestGroupIndex;
+                
+                currentGroupIndex = newChunkIndex;
+                correctGroupNumber = newChunk.content;
+                
+                // If there's a previous chunk, prepend it
+                if (currentGroupIndex > 0) {
+                    const prevChunk = spacedRepetitionDeck.find(chunk => chunk.chunkIndex === currentGroupIndex - 1);
+                    if (prevChunk) {
+                        correctGroupNumber = prevChunk.content + correctGroupNumber;
+                    }
+                }
+                
+                saveToLocalStorage();
+            } else {
+                // All chunks are learned and not due for review yet
+                messageTitle.textContent = trainingCompletedTitle;
+                messageContent.textContent = 'All chunks are learned and not due for review yet. Try again later.';
+                messageWindow.style.display = 'block';
+            }
+        }
+    }
+    
+    // Update the spaced repetition deck based on user performance
+    function updateSpacedRepetitionDeck(success) {
+        if (!spacedRepetitionMode) return;
+        
+        // Find the current chunk in the deck
+        const chunkIndex = spacedRepetitionDeck.findIndex(chunk => chunk.chunkIndex === currentGroupIndex);
+        
+        if (chunkIndex === -1) return; // Chunk not found
+        
+        const chunk = spacedRepetitionDeck[chunkIndex];
+        
+        if (success) {
+            // Successful recall - move to next box
+            if (chunk.box < 5) {
+                chunk.box++;
+            }
+        } else {
+            // Failed recall - back to box 1
+            chunk.box = 1;
+        }
+        
+        // Set the next review time based on the box
+        const now = Date.now();
+        switch (chunk.box) {
+            case 1: // Immediate
+                chunk.nextReview = now;
+                break;
+            case 2: // 1 day
+                chunk.nextReview = now + 86400000;
+                break;
+            case 3: // 3 days
+                chunk.nextReview = now + 259200000;
+                break;
+            case 4: // 7 days
+                chunk.nextReview = now + 604800000;
+                break;
+            case 5: // 14 days
+                chunk.nextReview = now + 1209600000;
+                break;
+        }
+        
+        saveToLocalStorage();
+    }
+    
     // Event Listeners
     startButton.addEventListener('click', startGame);
     
@@ -250,6 +433,7 @@ document.addEventListener('DOMContentLoaded', function() {
     messageOkButton.addEventListener('click', handleMessageOk);
     sequenceModeButton.addEventListener('click', toggleSequenceMode);
     repeatCountInput.addEventListener('change', updateRepeatCount);
+    spacedRepetitionModeButton && spacedRepetitionModeButton.addEventListener('click', toggleSpacedRepetitionMode);
     
     // Initialize the app
     initFromLocalStorage();
