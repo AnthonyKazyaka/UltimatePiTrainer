@@ -1,0 +1,254 @@
+/* Basic Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    color: #fff;
+    background: linear-gradient(to bottom, #0E0050, #00428F);
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+header {
+    text-align: center;
+    padding: 20px 0;
+}
+
+main {
+    flex: 1;
+}
+
+/* Settings Panel */
+.settings-panel {
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.settings-panel label {
+    margin-right: 10px;
+    font-size: 18px;
+}
+
+.settings-panel input {
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    width: 80px;
+    margin-right: 10px;
+}
+
+.settings-panel button,
+.game-panel button,
+.message-window button {
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.settings-panel button:hover,
+.game-panel button:hover,
+.message-window button:hover {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+/* Game Panel */
+.game-panel {
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.display-area {
+    margin-bottom: 20px;
+}
+
+.correct-display {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+#correct-numbers {
+    font-size: 24px;
+    font-weight: bold;
+    visibility: hidden;
+}
+
+#show-correct-button {
+    margin-left: 10px;
+}
+
+.input-area input {
+    width: 100%;
+    padding: 15px;
+    font-size: 24px;
+    text-align: right;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    color: #000;
+    margin-bottom: 20px;
+}
+
+/* Number Grid */
+.number-grid {
+    display: grid;
+    grid-gap: 10px;
+    margin-bottom: 20px;
+}
+
+.number-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-gap: 10px;
+}
+
+.number-button {
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.1));
+    border: none;
+    color: white;
+    font-size: 24px;
+    padding: 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.number-button:hover {
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.number-button.zero {
+    grid-column: span 3;
+}
+
+/* Practice Modes */
+.practice-modes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.mode-option {
+    display: flex;
+    align-items: center;
+    flex: 1;
+}
+
+.mode-option label {
+    margin-right: 10px;
+}
+
+.mode-option input {
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    width: 60px;
+}
+
+/* Spaced Repetition Styles */
+.spaced-repetition-info {
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 4px;
+    display: none;
+}
+
+.spaced-repetition-info.active {
+    display: block;
+}
+
+/* High Score Display */
+.highscore-display {
+    background-color: rgba(0, 0, 0, 0.3);
+    padding: 10px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+/* Message Window */
+.message-window {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #212121;
+    padding: 20px;
+    border-radius: 8px;
+    width: 80%;
+    max-width: 400px;
+    z-index: 10;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    text-align: center;
+}
+
+.message-window h3 {
+    margin-bottom: 10px;
+}
+
+.message-window hr {
+    border: 1px solid #f4f4f5;
+    margin-bottom: 15px;
+}
+
+.message-window p {
+    margin-bottom: 20px;
+    font-size: 18px;
+}
+
+.message-window button {
+    padding: 10px 40px;
+    font-size: 16px;
+}
+
+/* Footer */
+footer {
+    text-align: center;
+    padding: 20px 0;
+    margin-top: 20px;
+}
+
+/* Error Highlighting */
+.error {
+    color: #ff0000;
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+    .practice-modes {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .number-button {
+        padding: 15px;
+    }
+    
+    .settings-panel,
+    .game-panel {
+        padding: 15px;
+    }
+}
