@@ -10,6 +10,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  issues: write
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
@@ -24,12 +25,25 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all history
+          persist-credentials: true  # Ensure credentials are available for subsequent Git operations
+      
+      - name: Diagnostic information
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Directory contents: $(ls -la)"
+          echo "GitHub Ref: ${{ github.ref }}"
+          echo "GitHub Ref Name: ${{ github.ref_name }}"
+          echo "GitHub Event Name: ${{ github.event_name }}"
       
       - name: Update base href in index.html
         run: |
           # Update the base href in index.html with the correct root path
           sed -i 's|<base href="/">|<base href="/UltimatePiTrainer/">|g' index.html
           echo "Updated base href to /UltimatePiTrainer/"
+          # Verify the change
+          grep "<base href" index.html
       
       - name: Setup Pages
         uses: actions/configure-pages@v3
@@ -50,3 +64,7 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
+        
+      - name: Log deployment result
+        run: |
+          echo "Deployment completed. Page URL: ${{ steps.deployment.outputs.page_url }}"
