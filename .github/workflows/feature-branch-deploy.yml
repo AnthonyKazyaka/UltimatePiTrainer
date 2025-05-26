@@ -128,8 +128,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update PR description with branch URL
+      - name: Add preview URL comment to PR
+        id: add-comment
         if: steps.find-pr.outputs.has_pr == 'true'
+        continue-on-error: true  # Don't fail the workflow if this step fails
         run: |
           # Diagnostic information
           echo "Current directory: $(pwd)"
@@ -139,58 +141,34 @@ jobs:
           BRANCH_URL="https://anthonykazyaka.github.io/UltimatePiTrainer/branches/${{ env.SAFE_BRANCH_NAME }}/"
           echo "Branch URL: $BRANCH_URL"
           
-          # First, add a comment as a reliable fallback method
+          # Add a comment with the preview URL - keep it simple
           echo "Adding a comment to the PR with the preview URL..."
           COMMENT="### Preview Deployment\n\nYou can preview this branch at: [${BRANCH_URL}](${BRANCH_URL})"
           COMMENT_RESULT=$(gh api --method POST repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments \
             -f body="$COMMENT" 2>&1)
           COMMENT_STATUS=$?
-          echo "Comment API Status: $COMMENT_STATUS"
-          echo "Comment Result: $COMMENT_RESULT"
           
           if [ $COMMENT_STATUS -eq 0 ]; then
             echo "Successfully added comment with preview URL"
+            echo "comment_added=true" >> $GITHUB_OUTPUT
           else
-            echo "Failed to add comment. Will still try to update PR description."
-          fi
-          
-          # Now try to update the PR description
-          echo "Trying to update PR description..."
-          
-          # Get current PR description
-          echo "Fetching PR description..."
-          PR_INFO=$(gh pr view ${{ env.PR_NUMBER }} --json body 2>&1)
-          GH_STATUS=$?
-          echo "GitHub CLI PR view command exit status: $GH_STATUS"
-          
-          if [ $GH_STATUS -eq 0 ]; then
-            PR_BODY=$(echo "$PR_INFO" | jq -r '.body // ""' 2>/dev/null || echo "")
-            echo "Current PR body length: ${#PR_BODY}"
-            
-            # Check if URL is already in the description
-            if [[ "$PR_BODY" != *"$BRANCH_URL"* ]]; then
-              # Append the URL to the PR description
-              NEWLINE=$'\n'
-              UPDATED_BODY="${PR_BODY}${NEWLINE}${NEWLINE}### Preview Deployment${NEWLINE}${NEWLINE}You can preview this branch at: [${BRANCH_URL}](${BRANCH_URL})"
-              
-              # Update the PR description
-              echo "Updating PR description..."
-              # Use the GitHub REST API directly for better control
-              UPDATE_RESULT=$(gh api --method PATCH repos/${{ github.repository }}/pulls/${{ env.PR_NUMBER }} \
-                -f body="$UPDATED_BODY" 2>&1)
-              GH_STATUS=$?
-              echo "GitHub API PR update status: $GH_STATUS"
-              
-              if [ $GH_STATUS -eq 0 ]; then
-                echo "Successfully updated PR description with branch URL"
-              else
-                echo "Failed to update PR description - comment fallback was already used"
-              fi
-            else
-              echo "Branch URL already exists in PR description"
-            fi
-          else
-            echo "Failed to fetch PR description - comment fallback was already used"
+            echo "Failed to add comment with preview URL"
+            echo "Comment API Status: $COMMENT_STATUS"
+            echo "Comment Result: $COMMENT_RESULT"
+            echo "comment_added=false" >> $GITHUB_OUTPUT
+            # Don't fail the workflow, just report the issue
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Report preview URL status
+        run: |
+          if [[ "${{ steps.find-pr.outputs.has_pr }}" == "true" ]]; then
+            if [[ "${{ steps.add-comment.outputs.comment_added }}" == "true" ]]; then
+              echo "✅ Successfully added preview URL to PR #${{ env.PR_NUMBER }}"
+            else
+              echo "⚠️ Could not add preview URL to PR #${{ env.PR_NUMBER }}, but deployment was successful"
+            fi
+          else
+            echo "ℹ️ No PR found for this branch, but deployment was successful"
+          fi
